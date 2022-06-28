@@ -1,92 +1,117 @@
 
-let channelName = "welcomePage";
+var cursors = [];
 
-let nameInput 
-let feelingInput
+// variable used for incoming messages
+var x;
+var y;
+var r;
+var g;
+var b;
+var who;  
 
+let channelName = "clickCircles";
 
-let redVal;
-let greenVal;
-let blueVal;
+// variables from the previous page
+var url = new URL(window.location.href);
+var you = url.searchParams.get("you");
+var redVal = url.searchParams.get("r");
+var greenVal = url.searchParams.get("g");
+var blueVal = url.searchParams.get("b");
 
-let you;
+// printing out the values so that we know what is going on. 
+console.log(you);
+console.log(redVal);
+console.log(greenVal);
+console.log(blueVal);
+
+createServer(you); // creating our pubnub server with our name.
 
 function setup() {
 
     createCanvas(windowWidth, windowHeight);
 
-    nameInput = createInput();
-    nameInput.style('font-size', '30px');
-    nameInput.position(windowWidth/3, 325);
+    // listen for messages coming through the subcription feed on this specific channel. 
+    dataServer.addListener({ message: readIncoming});
+    dataServer.subscribe({ channels: [channelName] });
 
-    feelingInput = createInput();
-    feelingInput.style('font-size', '30px');
-    feelingInput.position(windowWidth/3, 435);
-
-    sliderRed = createSlider(0, 255, 255, 1);
-    sliderRed.position(windowWidth/3, 570);
-    sliderRed.style('width', '80px');
-    sliderBlue = createSlider(0, 255, 255, 1);
-    sliderBlue.position(windowWidth/3, 630);
-    sliderBlue.style('width', '80px');
-    sliderGreen = createSlider(0, 255, 255, 1);
-    sliderGreen.position(windowWidth/3, 690);
-    sliderGreen.style('width', '80px');
-
-
-    submitButton = createButton("Generate");
-    submitButton.position(windowWidth/3, 750);
-    submitButton.style('font-size', '30px');
-    
+    // create a new JSON object to store the mouse position, colours, and name of the user from the previous page
+    new allCursors(mouseX, mouseY, redVal, greenVal, blueVal, you);
   
   }
   
 function draw() {
-  background(redVal, blueVal, greenVal);
 
-  textSize(60);
+  background(255);
 
-  textAlign(CENTER);
+  sendTheMessage(); // send the message with the cursor location every 100ms.   
 
-  text("Mood Generator", windowWidth/2, 200);
-
-  textSize(30);
-  textAlign(LEFT);
-  text("What's your name?", windowWidth/3, 300);
-
-  text("How are you feeling today?", windowWidth/3, 420);
-
-  text("Mixing the colour about how you want to feel:", windowWidth/3, 520);
-  textSize(20);
-
-
-  text("Red", windowWidth/3, 560);
-  text("Green", windowWidth/3, 620);
-  text("Blue", windowWidth/3, 680);
-
-  redVal = sliderRed.value();
-  blueVal = sliderBlue.value();
-  greenVal = sliderGreen.value();
-
-  // on submit enter the information
-  submitButton.mousePressed(sendTheMessage);
-
+  for (let i = 0; i < cursors.length; i++) { // loop through all the cursors and show them on the page
+    noStroke(0);
+    fill(cursors[i].r,cursors[i].g,cursors[i].b)
+    ellipse(cursors[i].x, cursors[i].y, 100, 100);
+    textSize(20);
+    textAlign(CENTER);
+    fill(255-cursors[i].r,255-cursors[i].g,255-cursors[i].b); // make the text colour different
+    text(cursors[i].who, cursors[i].x, cursors[i].y+5);
+  
+  }
 }
- 
+  
+  // PubNub logic below
 function sendTheMessage() {
   // Send Data to the server to draw it in all other canvases
 
-  // check to see if they enter their name
-  if (nameInput.value() != "") { 
-    // if they did, save their name to the variable "you"
-    you = nameInput.value();
-    // load a new page when you press submit
-    window.location.href = "/../_pageTwo/index.html?you="+you+"&r="+redVal+"&g="+greenVal+"&b="+blueVal; 
+  dataServer.publish({
+    channel: channelName,
+    message: {
+      x: mouseX,
+      y: mouseY,
+      r: redVal, 
+      g: greenVal,
+      b: blueVal
+    },
+  });
+}
 
-  } else {
-    // if they have no entered their name, create an alert and ask them to enter their name
-    window.alert("Please enter your name!");
+function readIncoming(inMessage) {
+  // when new data comes in it triggers this function,
+  // we call this function in the setup
+
+  /*since an App can have many channels, we ensure that we are listening
+  to the correct channel */
+
+  if (inMessage.channel == channelName) {
+
+   x = inMessage.message.x; // get the mouseX value from the other people
+   y = inMessage.message.y; // get the mouseY value from the other people
+   r = inMessage.message.r; // get the red value from the other people
+   g = inMessage.message.g; // get the green value from the other people
+   b = inMessage.message.b; // get the blue value from the other people
+   who = inMessage.publisher; // who sent the message
+
+  //console.log(inMessage); //logging for information
+
+   let newinput = true; // we are checking to see if this person who sent the message is already on the page. 
+
+      for(let i = 0; i<cursors.length;i++) { // loop through all the IDs that have sent us messages before
+        if(who==cursors[i].who) { // if who is already in our array, update the x & y values
+          cursors[i].x = x;
+          cursors[i].y = y;
+          newinput = false;    // set the boolean to false since this is not a new user
+        }
+      }
+      if(newinput) { // if this is a new user, create a new JSON object that we add to our array
+        cursors.push(new allCursors(x,y,r,g,b,who));
+      }
   }
+}
+function allCursors(x,y,r,g,b,who){ // creates a new JSON object for us
  
+  this.x = x; // this is shorthand for saying "this object"
+  this.y = y;
+  this.r = r;
+  this.g = g;
+  this.b = b;
+  this.who = who;
 
 }
